@@ -1,5 +1,7 @@
 # Regime-Based Systematic Trading Strategy with Walk-Forward Validation and Monte Carlo Stress Testing
 
+Note: the included data/prices.csv is synthetic sample data - have not backtested on real data
+
 A regime-aware systematic trading pipeline: it classifies the market into
 volatility/trend regimes, applies different rules (mean reversion, trend
 following, defensive sizing) depending on the regime, and evaluates the
