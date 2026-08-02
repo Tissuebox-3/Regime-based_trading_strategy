@@ -1,0 +1,65 @@
+"""
+features.py
+------------
+Turns a raw price series into the feature set the regime classifier and
+strategy logic consume: returns, rolling vol, momentum/MAs, z-scores,
+drawdown, and (optionally) volume-based features.
+"""
+
+import numpy as np
+import pandas as pd
+
+
+def build_features(price: pd.Series, volume: pd.Series = None) -> pd.DataFrame:
+    """
+    Parameters
+    ----------
+    price : pd.Series indexed by date
+    volume : optional pd.Series indexed by date
+
+    Returns
+    -------
+    pd.DataFrame of engineered features, same index as `price`.
+    """
+    df = pd.DataFrame(index=price.index)
+    df["price"] = price
+
+    # --- Returns ---
+    df["ret_1d"] = price.pct_change()
+    df["ret_5d"] = price.pct_change(5)
+    df["log_ret_1d"] = np.log(price / price.shift(1))
+
+    # --- Momentum ---
+    df["mom_10"] = price.pct_change(10)
+    df["mom_20"] = price.pct_change(20)
+    df["mom_60"] = price.pct_change(60)
+
+    # --- Moving averages ---
+    df["ma_20"] = price.rolling(20).mean()
+    df["ma_50"] = price.rolling(50).mean()
+    df["ma_100"] = price.rolling(100).mean()
+    df["ma_ratio_20_100"] = df["ma_20"] / df["ma_100"] - 1.0
+
+    # --- Rolling volatility (annualized) ---
+    df["vol_10"] = df["ret_1d"].rolling(10).std() * np.sqrt(252)
+    df["vol_20"] = df["ret_1d"].rolling(20).std() * np.sqrt(252)
+    df["vol_60"] = df["ret_1d"].rolling(60).std() * np.sqrt(252)
+
+    # --- Volatility-of-volatility (regime instability signal) ---
+    df["vol_of_vol_20"] = df["vol_20"].rolling(20).std()
+
+    # --- Z-score of price vs its own 20d mean ---
+    df["zscore_20"] = (price - df["ma_20"]) / price.rolling(20).std()
+    df["zscore_60"] = (price - df["ma_50"]) / price.rolling(50).std()
+
+    # --- Drawdown from running peak ---
+    running_max = price.cummax()
+    df["drawdown"] = price / running_max - 1.0
+
+    # --- Volume features (optional) ---
+    if volume is not None:
+        df["volume"] = volume
+        df["vol_ma_20"] = volume.rolling(20).mean()
+        df["vol_zscore_20"] = (volume - df["vol_ma_20"]) / volume.rolling(20).std()
+
+    return df
